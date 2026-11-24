@@ -60,3 +60,11 @@ python source/build.py --output "21-功能-猎人状态计时器/romfs/nativeNX/
 ```
 
 可用 `--clang`、`--lld` 指定对应的可执行文件。此项目使用 [MHGU Forge](https://github.com/Fexty12573/forge) 的插件 ABI，参考 [MHGU Recomp](https://github.com/morerokk/MHGURecomp/blob/master/docs/STATUS.md) 的游戏结构和计时说明，并对照 MHGU 1.4.0 游戏代码确认字段。
+
+## 自动化构建
+
+`.github/workflows/build.yml` 在推送 `v*` 标签时自动用 clang + ld.lld 构建，并打包成可直接放进 `mods` 的压缩包挂到对应 Release；也可以在 Actions 页面手动 Run workflow（只构建、产出 Artifact，不动 Release）。
+
+## 许可证
+
+[MIT](LICENSE)
