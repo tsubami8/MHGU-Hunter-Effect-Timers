@@ -1,5 +1,4 @@
 # 猎人状态计时器 v0.5
-
 适用于游戏数据为 MHGU 1.4.0、内置 Forge 2.0 的 MHGU Recomp。已在 Windows 版 MHGU Recomp 0.20.0 验证。
 
 ## 下载
