@@ -33,8 +33,9 @@ jobs:
 
       - name: Package for mods folder
         run: |
-          mkdir -p "package/21-功能-猎人状态计时器/romfs/nativeNX/plugins"
-          cp "build/hunter_effect_timers.nro" "package/21-功能-猎人状态计时器/romfs/nativeNX/plugins/hunter_effect_timers.nro"
+          plugin_dir="package/21-功能-猎人状态计时器/romfs/nativeNX/plugins"
+          mkdir -p "$plugin_dir"
+          cp build/hunter_effect_timers.nro source/mhgu_effect_timers.cfg "$plugin_dir/"
           cd package
           zip -9 -r "../MHGU-Hunter-Effect-Timers-${{ github.ref_name }}.zip" "21-功能-猎人状态计时器"
           cd ..

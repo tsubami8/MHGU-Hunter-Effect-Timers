@@ -10,8 +10,6 @@
 #define RGBA(r, g, b, a) ((uint32_t)(r) | (uint32_t)(g) << 8 | (uint32_t)(b) << 16 | (uint32_t)(a) << 24)
 #define TEXT RGBA(255, 255, 255, 255)
 #define TEXT_OUTLINE RGBA(0, 0, 0, 220)
-#define FRAME_BLUE RGBA(70, 130, 230, 200)
-#define FRAME_SHADOW RGBA(12, 24, 49, 230)
 #define HP_GREEN RGBA(45, 205, 75, 120)
 #define HP_YELLOW RGBA(245, 200, 60, 220)
 #define HP_RED RGBA(230, 50, 50, 220)
@@ -43,7 +41,15 @@ typedef struct {
     float fraction;
 } Row;
 
-static const char settings_path[] = "mhgu_effect_timers.cfg";
+typedef struct {
+    uint32_t edge, shadow;
+} FrameColors;
+
+static const FrameColors buff_frame = {RGBA(70, 130, 230, 200), RGBA(12, 24, 49, 230)};
+static const FrameColors ailment_frame = {RGBA(225, 88, 99, 225), RGBA(58, 20, 29, 235)};
+// Recomp resolves this shipped file through the active mod's RomFS, including renamed folders.
+static const char settings_path[] = "app:/nativeNX/plugins/mhgu_effect_timers.cfg";
+static const char legacy_settings_path[] = "mhgu_effect_timers.cfg";
 static Settings settings;
 static bool pending_save, save_failed, compatible, item_tracking, chinese;
 static bool preview = true, editing_settings;
@@ -92,30 +98,40 @@ static void defaults(void)
     for (unsigned i = 0; i < MAX_EFFECTS; ++i) settings.visible[i] = true;
 }
 
+static bool read_settings(const char *path, Settings *stored)
+{
+    ImFileHandle file = igImFileOpen(path, "rb");
+    if (!file) return false;
+
+    const size_t file_sizes[] = {0, offsetof(Settings, row_height), offsetof(Settings, row_height),
+                                offsetof(Settings, split_columns), sizeof(Settings)};
+    const size_t version_size = sizeof(stored->version);
+    bool read = igImFileRead(&stored->version, version_size, 1, file) == 1 &&
+                stored->version >= 1 && stored->version <= SETTINGS_VERSION &&
+                igImFileRead((char *)stored + version_size,
+                             file_sizes[stored->version] - version_size, 1, file) == 1;
+    igImFileClose(file);
+    return read;
+}
+
 static void load_settings(void)
 {
     defaults();
-    ImFileHandle file = igImFileOpen(settings_path, "rb");
-    if (!file) return;
-
     Settings stored;
-    const bool read = igImFileRead(&stored, offsetof(Settings, row_height), 1, file) == 1;
-    const bool read_style = read && stored.version >= 3 && stored.version <= SETTINGS_VERSION &&
-                            igImFileRead(&stored.row_height, sizeof(int) * 2, 1, file) == 1;
-    const bool read_split = read_style && stored.version >= 4 &&
-                            igImFileRead(&stored.split_columns, sizeof(stored.split_columns), 1, file) == 1;
-    igImFileClose(file);
-    if (!read || stored.version < 1 || stored.version > SETTINGS_VERSION) return;
+    if (!read_settings(settings_path, &stored)) {
+        if (!read_settings(legacy_settings_path, &stored)) return;
+        pending_save = true;
+    }
 
     settings.x = (int)clamp(stored.x, 0, 100);
     settings.y = (int)clamp(stored.y, 0, 100);
     settings.scale = (int)clamp(stored.scale, 65, 200);
     settings.sort = (int)clamp(stored.sort, SHORTEST, AILMENT_FIRST);
-    if (read_style) {
+    if (stored.version >= 3) {
         settings.row_height = (int)clamp(stored.row_height, 20, 76);
         settings.background_transparency = (int)clamp(stored.background_transparency, 0, 100);
     }
-    if (read_split) settings.split_columns = stored.split_columns != 0;
+    if (stored.version >= 4) settings.split_columns = stored.split_columns != 0;
     settings.enabled = stored.enabled != 0;
     for (unsigned i = 0; i < MAX_EFFECTS; ++i) settings.visible[i] = stored.visible[i] != 0;
     if (stored.version == 1 && ITEM_FILTER_START + item_count <= MAX_EFFECTS) {
@@ -127,7 +143,7 @@ static void load_settings(void)
 
 static void save_settings(void)
 {
-    ImFileHandle file = igImFileOpen(settings_path, "wb");
+    ImFileHandle file = igImFileOpen(settings_path, "r+b");
     bool written = false;
     if (file) {
         written = igImFileWrite(&settings, sizeof(settings), 1, file) == 1;
@@ -135,6 +151,7 @@ static void save_settings(void)
     }
     pending_save = false;
     save_failed = !written;
+    if (save_failed) forge_log(2, "[Hunter Effect Timers] Could not write mod configuration: %s", settings_path);
 }
 
 static bool precedes(Row a, Row b)
@@ -220,30 +237,30 @@ static void fill_rect(ImDrawList *draw, float x0, float y0, float x1, float y1, 
     ImDrawList_AddRectFilled(draw, (ImVec2){x0, y0}, (ImVec2){x1, y1}, color, 0, 0);
 }
 
-static void draw_rule(ImDrawList *draw, float x, float right, float y, float stroke)
+static void draw_rule(ImDrawList *draw, float x, float right, float y, float stroke, FrameColors frame)
 {
-    fill_rect(draw, x, y, right, y + stroke, FRAME_SHADOW);
+    fill_rect(draw, x, y, right, y + stroke, frame.shadow);
     const float pitch = 8 * stroke;
     for (float segment = x; segment < right; segment += pitch) {
         const float end = clamp(segment + pitch - stroke, segment, right);
-        fill_rect(draw, segment, y, end, y + stroke, FRAME_BLUE);
+        fill_rect(draw, segment, y, end, y + stroke, frame.edge);
     }
 }
 
 static void draw_end(ImDrawList *draw, float outer, float direction, float cap_width,
-                     float y, float height, float stroke)
+                     float y, float height, float stroke, FrameColors frame)
 {
     const float x = direction > 0 ? outer : outer - cap_width;
-    fill_rect(draw, x, y, x + cap_width, y + height, FRAME_SHADOW);
+    fill_rect(draw, x, y, x + cap_width, y + height, frame.shadow);
     const float outer_rail = outer + direction * stroke;
     const float inner_rail = outer + direction * (cap_width - stroke);
     const float x0 = direction > 0 ? outer_rail : inner_rail;
     const float x1 = direction > 0 ? inner_rail : outer_rail;
-    fill_rect(draw, x0, y + stroke, x0 + stroke, y + height - stroke, FRAME_BLUE);
-    fill_rect(draw, x1 - stroke, y + stroke, x1, y + height - stroke, FRAME_BLUE);
+    fill_rect(draw, x0, y + stroke, x0 + stroke, y + height - stroke, frame.edge);
+    fill_rect(draw, x1 - stroke, y + stroke, x1, y + height - stroke, frame.edge);
     for (int mark = 1; mark <= 2; ++mark) {
         const float notch_y = y + height * mark / 3.0f - stroke * 0.5f;
-        fill_rect(draw, x0, notch_y, x1, notch_y + stroke, FRAME_BLUE);
+        fill_rect(draw, x0, notch_y, x1, notch_y + stroke, frame.edge);
     }
 }
 
@@ -286,17 +303,22 @@ static void draw_column(ImDrawList *draw, ImFont *font, const Row *rows, unsigne
     const unsigned alpha = (unsigned)(100 - settings.background_transparency) * 255 / 100;
     fill_rect(draw, fill_left, y, fill_right, y + visible * line, RGBA(0, 0, 0, alpha));
 
+    bool previous_ailment = false;
     for (unsigned i = 0; i < visible; ++i) {
         const float top = y + i * line;
+        const Effect *effect = &effects[rows[i].index];
+        const bool ailment = effect->kind == AILMENT;
+        const FrameColors frame = ailment ? ailment_frame : buff_frame;
         const float ratio = clamp(rows[i].fraction, 0, 1);
         const unsigned percent = (unsigned)(ratio * 100.0f + 0.5f);
         const uint32_t fill = percent >= 51 ? HP_GREEN : (percent >= 25 ? HP_YELLOW : HP_RED);
         fill_rect(draw, fill_left, top, fill_left + (fill_right - fill_left) * ratio, top + line, fill);
-        draw_end(draw, x, 1, cap, top, line, stroke);
-        draw_end(draw, right, -1, cap, top, line, stroke);
-        draw_rule(draw, x, right, top, stroke);
+        draw_end(draw, x, 1, cap, top, line, stroke, frame);
+        draw_end(draw, right, -1, cap, top, line, stroke, frame);
+        // A shared rule between two effects also serves as the ailment's frame.
+        draw_rule(draw, x, right, top, stroke, ailment || previous_ailment ? ailment_frame : buff_frame);
+        previous_ailment = ailment;
 
-        const Effect *effect = &effects[rows[i].index];
         const int item_index = rows[i].item_index;
         const char *effect_name = label(effect->english, effect->chinese);
         const char *name = item_index < 0 ? effect_name : label(items[item_index].english, items[item_index].chinese);
@@ -319,7 +341,7 @@ static void draw_column(ImDrawList *draw, ImFont *font, const Row *rows, unsigne
         draw_label(draw, font, size, fill_left + padding, text_y, name);
         draw_label(draw, font, size, fill_right - padding - value_em * size, text_y, progress);
     }
-    draw_rule(draw, x, right, y + visible * line - stroke, stroke);
+    draw_rule(draw, x, right, y + visible * line - stroke, stroke, previous_ailment ? ailment_frame : buff_frame);
 }
 
 static void draw_hud(const Row *rows, unsigned count, bool example)
@@ -400,7 +422,7 @@ EXPORT void forge_onInit(void)
     compatible = effect_count <= ITEM_FILTER_START && ITEM_FILTER_START + item_count <= MAX_EFFECTS &&
                  game_init(forge_mem_getMainTextAddr());
     forge_log(compatible ? 1 : 2, "[Hunter Effect Timers] %s",
-              compatible ? "v0.4, MHGU 1.4.0 profile active" : "Unsupported game build");
+              compatible ? "v0.5, MHGU 1.4.0 profile active" : "Unsupported game build");
     if (!compatible) return;
     item_tracking = game_track_item_use();
     forge_log(item_tracking ? 1 : 2, "[Hunter Effect Timers] %s",

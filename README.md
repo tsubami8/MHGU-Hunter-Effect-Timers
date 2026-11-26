@@ -1,15 +1,15 @@
-# 猎人状态计时器 v0.4
+# 猎人状态计时器 v0.5
 
-适用于游戏数据为 MHGU 1.4.0、内置 Forge 2.0 的 MHGU Recomp。测试使用 Windows 版 MHGU Recomp 0.18.1。
+适用于游戏数据为 MHGU 1.4.0、内置 Forge 2.0 的 MHGU Recomp。已在 Windows 版 MHGU Recomp 0.20.0 验证。
 
 ## 下载
 
-从 [Releases](https://github.com/tsubami8/MHGU-Hunter-Effect-Timers/releases) 下载 `MHGU-Hunter-Effect-Timers-v0.4.zip`（解压后把 `21-功能-猎人状态计时器` 放进 `mods\`）。源码在本仓库 `source/`。
+从 [Releases](https://github.com/tsubami8/MHGU-Hunter-Effect-Timers/releases) 下载 `MHGU-Hunter-Effect-Timers-v0.5.zip`（解压后把 `21-功能-猎人状态计时器` 放进 `mods\`）。源码在本仓库 `source/`。
 
 ## 安装
 
 1. 退出游戏。
-2. 把压缩包中的 `21-功能-猎人状态计时器` 文件夹复制到 `F:\MHGURecomp\mods\`。升级时覆盖现有模组文件夹内的 `hunter_effect_timers.nro`。旧版位置、大小、行高、背景透明度、排序和筛选设置会继续使用。
+2. 全新安装时，把压缩包中的 `21-功能-猎人状态计时器` 文件夹复制到 `F:\MHGURecomp\mods\`。升级时替换插件 `hunter_effect_timers.nro`，并保留模组目录里已有的 `mhgu_effect_timers.cfg`。如果旧配置还在 Recomp 根目录，而且模组的 `romfs\nativeNX\plugins` 下没有配置，把旧配置移到该目录即可保留设置。
 3. 启动游戏。按 `Insert` 打开 Forge，展开 **Plugin UI → 猎人状态计时器**。英文界面中的名称为 **Hunter Effect Timers**。如果自定义了 Forge 的菜单按键，请用对应的按键。
 
 手柄可从 Recomp 的 **设置 → 模组 → 打开 Forge 菜单** 进入。
@@ -26,9 +26,9 @@
 - **排序方式** 支持剩余时间从短到长、从长到短、增益优先、异常优先。后两种模式的同组效果按剩余时间从短到长排列。
 - 展开 **按道具名称筛选**，分别开关狂奔药、狂奔药G、怪力种子、怪力药丸等。**通用增益效果** 控制无从确认道具来源的计时以及其他增益，**异常状态** 按状态开关。
 - 展开模组设置时可预览位置、大小、排序和筛选结果。
-- 收起设置或关闭 Forge 菜单时会保存，也可以点 **保存设置**。设定保存在 Recomp 工作目录里的 `mhgu_effect_timers.cfg`，通常和 `mhgurecomp.exe` 同目录。
+- 收起设置或关闭 Forge 菜单时会保存，也可以点 **保存设置**。设置保存在模组的 `romfs\nativeNX\plugins\mhgu_effect_timers.cfg`。如果使用了压缩包附带的初始配置，插件启动时会尝试导入根目录的旧配置，之后可移走根目录的旧文件。
 
-每行蓝框共用分隔线。填充从右向左缩短，百分比显示为整数。`100–51%` 为绿色，`50–25%` 为黄色，`24–0%` 为红色。填充色取自本机 01 号显血模组目前配置。端框采用自绘蓝色阶梯图形。
+增益用蓝框，异常状态用偏红的警示框，两者采用相同的阶梯端框。相邻行共用分隔线，与异常行相邻的分隔线显示为红色。填充从右向左缩短，百分比显示为整数。`100–51%` 为绿色，`50–25%` 为黄色，`24–0%` 为红色。填充色取自本机 01 号显血模组目前配置。
 
 ## 支持的效果
 
@@ -49,7 +49,7 @@
 
 ## 卸载
 
-退出游戏后，从 `mods` 中移除 `21-功能-猎人状态计时器` 文件夹。要一并清除设置，可删除 `mhgu_effect_timers.cfg`。
+退出游戏后，从 `mods` 中移除 `21-功能-猎人状态计时器` 文件夹，配置也会随模组文件夹移除。要继续使用模组并恢复原始设置，请在 Forge 菜单中点 **恢复默认**。
 
 ## 源码
 
@@ -58,6 +58,8 @@
 ```powershell
 python source/build.py --output "21-功能-猎人状态计时器/romfs/nativeNX/plugins/hunter_effect_timers.nro"
 ```
+
+首次安装自行构建的插件时，将 `source/mhgu_effect_timers.cfg` 一并复制到插件所在目录。
 
 可用 `--clang`、`--lld` 指定对应的可执行文件。此项目使用 [MHGU Forge](https://github.com/Fexty12573/forge) 的插件 ABI，参考 [MHGU Recomp](https://github.com/morerokk/MHGURecomp/blob/master/docs/STATUS.md) 的游戏结构和计时说明，并对照 MHGU 1.4.0 游戏代码确认字段。
 
